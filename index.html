@@ -1,0 +1,291 @@
+<!doctype html>
+<head>
+  <meta charset="utf-8">
+  <title>Mitteilungsblatt</title>
+
+  <style>
+    body {
+      display: grid;
+      font-family: sans-serif;
+    }
+    .page-container {
+      display: none;
+      /*box-shadow: 0 1px 3px #444;*/
+      position: relative;
+      font-size: 1px;
+      line-height: 1;
+      overflow: hidden;
+    }
+    span {
+      display: none;
+      position: absolute;
+      cursor: text;
+      /*white-space: pre;*/
+      transform-origin: left bottom;
+      line-height: 1.1;
+    }
+    .section {
+      display: none;
+      margin-bottom: 50px;
+    }
+    .page-container-stuebach, .section-stuebach {
+      display: block;
+      position: relative;
+    }
+    .section-stuebach span {
+      display: inline;
+    }
+
+/**/
+    .page-container {
+      width: 100%!important;
+      height: 100%!important;
+    }
+    .section-stuebach span {
+      display: block;
+      position: unset;
+    }
+    .headline {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!--<script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>-->
+  <!--<script src="pdf.js"></script>-->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/1.10.100/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+  <script>
+    PDFJS.disableWorker = true
+    // PDFJS.workerSrc = 'bower_components/pdfjs-dist/build/pdf.worker.js'
+    // PDFJS.cMapUrl = 'bower_components/pdfjs-dist/cmaps'
+    // PDFJS.cMapPacked = true
+    PDFJS.disableRange = true
+    // PDFJS.disableStream = true
+  </script>
+
+  <script>
+    // Kalenderwoche ermitteln
+    Date.prototype.getWeekNumber = function(){
+      var d = new Date(Date.UTC(this.getFullYear(), this.getMonth(), this.getDate()));
+      var dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+      return Math.ceil((((d - yearStart) / 86400000) + 1)/7)
+    };
+
+    window.kw = new Date().getWeekNumber();
+
+    //console.log('kw= ',window.kw);
+
+    var today = new Date();
+    // 0 = Sonntag
+    // Wenn Mo Di Mi dann vorherige Kalenderwoche
+    if(today.getDay() == 1 || today.getDay() == 2 || today.getDay() == 3) window.kw = --window.kw;
+    //console.log('kw= ',window.kw);
+
+    // Php Seite Aufrufen damit PDF auf FTP abgelegt wird
+    $.get('https://www.steinermarco.de/mitteilungsblatt/pdf/'+window.kw+'.pdf').done(function() { 
+        // exists code 
+        console.log('PDF existiert');
+    }).fail(function() { 
+      console.log('PDF existiert nicht');
+      $.get("https://www.steinermarco.de/mitteilungsblatt/pdf.php");
+    });
+
+    //$.get("https://www.steinermarco.de/mitteilungsblatt/pdf.php");
+
+    PDFJS.getDocument(
+      //'https://archiv.wittich.de/epapers/pdf/2421/2022/49.pdf'
+      {
+        url:'https://www.steinermarco.de/mitteilungsblatt/pdf/'+window.kw+'.pdf',
+        //url:'https://www.steinermarco.de/mitteilungsblatt/pdf/44.pdf',
+        crossDomain: true, 
+        cache: false,
+        mode:'no-cors',
+        'Access-Control-Allow-Credentials': true,
+        'Access-Control-Allow-Headers':'*',
+        ' Access-Control-Allow-Methods':"POST, GET, OPTIONS, DELETE, PUT", 
+        'Access-Control-Allow-Methods':'GET', 
+        httpHeaders: {'Access-Control-Allow-Origin':'*'}
+      }).then(function (pdf) {
+      var ctx = document.createElement('canvas').getContext('2d', { alpha: false });
+      window.totalPages = pdf.numPages;
+
+      for (var i = 1; i <= pdf.numPages; i++) {
+        pdf.getPage(i).then(function (page) {
+          var viewport = page.getViewport(1.5);
+          var pageContainer = document.createElement('div');
+          var pageIndex = page.pageIndex;
+          var index = pageIndex++;
+          pageContainer.classList.add('page-container');
+          pageContainer.classList.add('page-'+pageIndex);
+          pageContainer.style.width = viewport.width + 'px';
+          pageContainer.style.height = viewport.height + 'px';
+          pageContainer.style.order = pageIndex;
+          pageContainer.setAttribute("id", 'page-'+pageIndex);
+
+          var yOffset = 0;
+          var preFontSize = 0;
+
+          // var pageContainer = document.createElementNS('http://www.w3.org/2000/svg', 'svg:svg');
+          // pageContainer.setAttribute('width', viewport.width + 'px');
+          // pageContainer.setAttribute('height', viewport.height + 'px');
+          // pageContainer.setAttribute('font-size', 1);
+
+
+          // page.getOperatorList().then(function (opList) {
+          //   var svgGfx = new PDFJS.SVGGraphics(page.commonObjs, page.objs);
+          //
+          //   svgGfx.getSVG(opList, viewport).then(function (svg) {
+          //     pageContainer.appendChild(svg);
+          //   });
+          // });
+
+          page.getTextContent({ normalizeWhitespace: true }).then(function (textContent) {
+            textContent.items.forEach(function (textItem) {
+              var tx = PDFJS.Util.transform(
+                PDFJS.Util.transform(viewport.transform, textItem.transform),
+                [1, 0, 0, -1, 0, 0]
+              );
+
+              var style = textContent.styles[textItem.fontName];
+
+              //console.log('style= ', style);
+              //console.log('tx= ', tx);
+              
+              // adjust for font ascent/descent
+              var fontSize = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]));
+
+              if (style.ascent) {
+                tx[5] -= fontSize * style.ascent;
+              } else if (style.descent) {
+                tx[5] -= fontSize * (1 + style.descent);
+              } else {
+                tx[5] -= fontSize / 2;
+              }
+              
+              // adjust for rendered width
+              if (textItem.width > 0) {
+                ctx.font = tx[0] + 'px ' + style.fontFamily;
+                
+                var width = ctx.measureText(textItem.str).width;
+
+                if (width > 0) {
+                  //tx[0] *= (textItem.width * viewport.scale) / width;
+                  tx[0] = (textItem.width * viewport.scale) / width;
+                }
+              }
+
+              // var item = document.createElementNS('http://www.w3.org/2000/svg', 'svg:text');
+              // item.textContent = textItem.str;
+              // item.setAttribute('font-family', style.fontFamily);
+              // item.setAttribute('transform', 'matrix(' + tx.join(' ') + ')');
+
+              var item = document.createElement('span');
+              var pageIndex = page.pageIndex;
+              var index = pageIndex++;
+              item.textContent = textItem.str;
+              item.style.fontFamily = style.fontFamily;
+              //item.style.transform = 'matrix(' + tx.join(',') + ')';
+              item.style.fontSize = fontSize + 'px';
+              item.style.transform = 'scaleX(' + tx[0] + ')';
+              item.style.left = tx[4] + 'px';
+              item.style.top = tx[5] + 'px';
+
+
+              //console.log('fontname = ', textItem.fontName);
+              item.classList.add(textItem.fontName);
+
+              if (textItem.str.includes('Stübach')) {
+                  //console.log('Stübach ist enthalten');
+                  item.classList.add('stuebach');
+              }
+
+              // if (fontSize >= '17') {
+              //   item.classList.add('headline');
+              //   item.setAttribute("id", "headline");
+              // }
+
+              // Wenn vorherige Schriftgröße kleiner als die danach dann eine Headline einfügen
+              if(preFontSize < fontSize) {
+                if (fontSize <= '22') {
+                  item.classList.add('headline');
+                  item.setAttribute("id", "headline");
+                }
+              }
+              preFontSize = fontSize;
+
+              // Wenn vorheriger Y-Wert größer als der danach dann eine Headline einfügen
+              //console.log('yOffset = ', yOffset);
+
+              if (yOffset > tx[5]+5) {
+                item.classList.add('headline');
+                item.setAttribute("id", "headline");
+              }
+              yOffset = tx[5];
+
+
+              pageContainer.appendChild(item);
+            });
+
+            document.body.appendChild(pageContainer);
+
+          });
+
+
+        });
+      }
+
+    });
+
+    const observer = new MutationObserver((mutations, obs) => {
+      const id = 'page-'+window.totalPages;
+      const headline = document.getElementById(id);
+      var pages = $('.page-container').length;
+
+      //console.log('totalPages = ', window.totalPages);
+
+      if (pages == window.totalPages) {
+        //console.log('Element da')
+        $(".headline").each(function() {
+          $(this).nextUntil(".headline").addBack().wrapAll("<div id='section' class='section'/>");
+        });
+
+        obs.disconnect();
+        return;
+      }
+    });
+    observer.observe(document, {
+      childList: true,
+      subtree: true
+    });
+
+    const observer2 = new MutationObserver((mutations, obs) => {
+      const section = document.getElementById('section');
+
+      if (section) {
+        //console.log('Section da')
+        $(".section").each(function() {
+          var text= $(this).html();
+          if (text.includes('Stübach')) {
+            $(this).addClass('section-stuebach');
+            $(this).closest('.page-container').addClass('page-container-stuebach');
+            $('.loading').remove();
+          }
+        });
+
+        obs.disconnect();
+        return;
+      }
+    });
+    observer2.observe(document, {
+      childList: true,
+      subtree: true
+    });
+  </script>
+  <div class="loading">Bitte warten...</div>
+</body>

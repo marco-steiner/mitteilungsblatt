@@ -78,6 +78,7 @@
     };
 
     window.kw = new Date().getWeekNumber();
+    window.year = new Date().getFullYear();
 
     //console.log('kw= ',window.kw);
 
@@ -85,10 +86,13 @@
     // 0 = Sonntag
     // Wenn Mo Di Mi dann vorherige Kalenderwoche
     if(today.getDay() == 1 || today.getDay() == 2 || today.getDay() == 3) window.kw = --window.kw;
-    //console.log('kw= ',window.kw);
+
+    //window.kw = ++window.kw; // 2023 eine KW verschoben
+    console.log('kw= ',window.kw);
+    console.log('year= ',window.year);
 
     // Php Seite Aufrufen damit PDF auf FTP abgelegt wird
-    $.get('https://www.steinermarco.de/mitteilungsblatt/pdf/'+window.kw+'.pdf').done(function() { 
+    $.get('https://www.steinermarco.de/mitteilungsblatt/pdf/'+window.year+'/'+window.kw+'.pdf').done(function() { 
         // exists code 
         console.log('PDF existiert');
     }).fail(function() { 
@@ -101,8 +105,8 @@
     PDFJS.getDocument(
       //'https://archiv.wittich.de/epapers/pdf/2421/2022/49.pdf'
       {
-        url:'https://www.steinermarco.de/mitteilungsblatt/pdf/'+window.kw+'.pdf',
-        //url:'https://www.steinermarco.de/mitteilungsblatt/pdf/44.pdf',
+        url:'https://www.steinermarco.de/mitteilungsblatt/pdf/'+window.year+'/'+window.kw+'.pdf',
+        //url:'https://www.steinermarco.de/mitteilungsblatt/pdf/2022/44.pdf',
         crossDomain: true, 
         cache: false,
         mode:'no-cors',
